@@ -2,7 +2,7 @@ package process
 
 import "fmt"
 
-func Init() {
+func init() {
 	fmt.Println("No process reaper initialization under windows")
 	fmt.Println("---------------------")
 }
