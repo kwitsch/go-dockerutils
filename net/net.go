@@ -16,6 +16,9 @@ type DockerResolver struct {
 }
 
 func (resolver *DockerResolver) Init() error {
+	if resolver.Startup < 5*time.Second {
+		resolver.Startup = 5 * time.Second
+	}
 	for i := 0; i < int(resolver.Startup.Seconds()); i++ {
 		r, rErr := intGetResolver(resolver)
 		if rErr == nil {
@@ -45,9 +48,6 @@ func (r *DockerResolver) VPrint(msg string) {
 		fmt.Println(msg)
 	}
 }
-
-
-
 
 func intLookUp(resolver *net.Resolver, domain string) ([]string, error) {
 	return resolver.LookupHost(context.Background(), domain)
