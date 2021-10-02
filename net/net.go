@@ -24,7 +24,6 @@ func (resolver *DockerResolver) Init() error {
 		r, rErr := intGetResolver(resolver)
 		if rErr == nil {
 			resolver.netResolver = r
-			resolver.setDialer()
 			resolver.VPrint("Resolver initialized")
 			return nil
 		} else {
@@ -45,22 +44,35 @@ func (r *DockerResolver) LookUp(domain string) ([]string, error) {
 	}
 }
 
+func (r *DockerResolver) GetHttpClient() (*http.Client, error) {
+	if r.netResolver != nil {
+		dialer, _ := r.GetDialer()
+		tr := &http.Transport{
+			Dial: dialer.Dial,
+		}
+
+		client := http.Client{Transport: tr}
+		return &client, nil
+	} else {
+		return nil, errors.New("Resolver not initialized")
+	}
+}
+
+func (r *DockerResolver) GetDialer() (*net.Dialer, error) {
+	if r.netResolver != nil {
+		return &net.Dialer{
+			Timeout:  5 * time.Second,
+			Resolver: r.netResolver,
+		}, nil
+	} else {
+		return nil, errors.New("Resolver not initialized")
+	}
+}
+
 func (r *DockerResolver) VPrint(msg string) {
 	if r.Verbose {
 		fmt.Println(msg)
 	}
-}
-
-func (resolver *DockerResolver) setDialer() {
-	dialer := &net.Dialer{
-		Resolver: resolver.netResolver,
-	}
-
-	dialContext := func(ctx context.Context, network, addr string) (net.Conn, error) {
-		return dialer.DialContext(ctx, network, addr)
-	}
-
-	http.DefaultTransport.(*http.Transport).DialContext = dialContext
 }
 
 func intLookUp(resolver *net.Resolver, domain string) ([]string, error) {
