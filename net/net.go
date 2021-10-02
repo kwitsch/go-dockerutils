@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net"
+	"net/http"
 	"time"
 )
 
@@ -23,6 +24,7 @@ func (resolver *DockerResolver) Init() error {
 		r, rErr := intGetResolver(resolver)
 		if rErr == nil {
 			resolver.netResolver = r
+			resolver.setDialer()
 			resolver.VPrint("Resolver initialized")
 			return nil
 		} else {
@@ -47,6 +49,18 @@ func (r *DockerResolver) VPrint(msg string) {
 	if r.Verbose {
 		fmt.Println(msg)
 	}
+}
+
+func (resolver *DockerResolver) setDialer() {
+	dialer := &net.Dialer{
+		Resolver: resolver.netResolver,
+	}
+
+	dialContext := func(ctx context.Context, network, addr string) (net.Conn, error) {
+		return dialer.DialContext(ctx, network, addr)
+	}
+
+	http.DefaultTransport.(*http.Transport).DialContext = dialContext
 }
 
 func intLookUp(resolver *net.Resolver, domain string) ([]string, error) {
