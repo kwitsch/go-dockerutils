@@ -2,6 +2,7 @@ package net
 
 import (
 	"context"
+	"crypto/tls"
 	"errors"
 	"fmt"
 	"net"
@@ -48,7 +49,8 @@ func (r *DockerResolver) GetHttpClient() (*http.Client, error) {
 	if r.netResolver != nil {
 		dialer, _ := r.GetDialer()
 		tr := &http.Transport{
-			Dial: dialer.Dial,
+			Dial:            dialer.Dial,
+			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
 		}
 
 		client := http.Client{Transport: tr}
