@@ -11,10 +11,11 @@ import (
 )
 
 type DockerResolver struct {
-	Resolver    string        `koanf:"resolver"`
-	Startup     time.Duration `koanf:"startup" default:"5s"`
-	Verbose     bool          `koanf:"verbose" default:"false"`
-	netResolver *net.Resolver
+	Resolver     string        `koanf:"resolver"`
+	Startup      time.Duration `koanf:"startup" default:"5s"`
+	Verbose      bool          `koanf:"verbose" default:"false"`
+	InsecureHttp bool          `koanf:"insecure_http" default:"false"`
+	netResolver  *net.Resolver
 }
 
 func (self *DockerResolver) Init() error {
@@ -49,8 +50,10 @@ func (self *DockerResolver) GetHttpClient() (*http.Client, error) {
 	if self.netResolver != nil {
 		dialer, _ := self.GetDialer()
 		tr := &http.Transport{
-			Dial:            dialer.Dial,
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			Dial: dialer.Dial,
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: self.InsecureHttp,
+			},
 		}
 
 		client := http.Client{Transport: tr}
@@ -101,7 +104,7 @@ func intGetResolver(resolver *DockerResolver) (*net.Resolver, error) {
 		resolver.VPrint("GetResolverEx: " + ip)
 		return intBaseResolver(addr.String()), nil
 	} else {
-		tReso := intBaseResolver("127.0.0.11")
+		tReso := intBaseResolver("127.0.0.11:53")
 		dRes, dResErr := intLookUp(tReso, resolver.Resolver)
 		if dResErr == nil && len(dRes) > 0 {
 			ip = dRes[0]
