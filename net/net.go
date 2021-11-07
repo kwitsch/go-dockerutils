@@ -3,76 +3,79 @@ package net
 import (
 	"context"
 	"crypto/tls"
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
+	"strings"
 	"time"
 )
 
 type DockerResolver struct {
-	Resolver    string        `koanf:"resolver"`
-	Startup     time.Duration `koanf:"startup"`
-	Verbose     bool          `koanf:"verbose"`
-	netResolver *net.Resolver
+	Resolver     string        `koanf:"resolver"`
+	Startup      time.Duration `koanf:"startup" default:"5s"`
+	Verbose      bool          `koanf:"verbose" default:"false"`
+	InsecureHttp bool          `koanf:"insecure_http" default:"false"`
+	netResolver  *net.Resolver
 }
 
-func (resolver *DockerResolver) Init() error {
-	if resolver.Startup < 5*time.Second {
-		resolver.Startup = 5 * time.Second
+func (self *DockerResolver) Init() error {
+	if !strings.Contains(self.Resolver, ":") {
+		self.Resolver += ":53"
 	}
-	for i := 0; i < int(resolver.Startup.Seconds()); i++ {
-		r, rErr := intGetResolver(resolver)
+	for i := 0; i < int(self.Startup.Seconds()); i++ {
+		r, rErr := intGetResolver(self)
 		if rErr == nil {
-			resolver.netResolver = r
-			resolver.VPrint("Resolver initialized")
+			self.netResolver = r
+			self.VPrint("Resolver initialized")
 			return nil
 		} else {
-			resolver.VPrint("Resolver lookup failed")
+			self.VPrint("Resolver lookup failed")
 			time.Sleep(time.Second)
 		}
 	}
-	return errors.New("Can't get resolver for " + resolver.Resolver)
+	return fmt.Errorf("Can't get resolver for %s", self.Resolver)
 }
 
-func (r *DockerResolver) LookUp(domain string) ([]string, error) {
-	if r.netResolver != nil {
-		res, resErr := intLookUp(r.netResolver, domain)
-		r.VPrint("LookUp: " + domain + " Result: " + res[0])
+func (self *DockerResolver) LookUp(domain string) ([]string, error) {
+	if self.netResolver != nil {
+		res, resErr := intLookUp(self.netResolver, domain)
+		self.VPrint("LookUp: " + domain + " Result: " + res[0])
 		return res, resErr
 	} else {
-		return nil, errors.New("Resolver not initialized")
+		return nil, fmt.Errorf("Resolver not initialized")
 	}
 }
 
-func (r *DockerResolver) GetHttpClient() (*http.Client, error) {
-	if r.netResolver != nil {
-		dialer, _ := r.GetDialer()
+func (self *DockerResolver) GetHttpClient() (*http.Client, error) {
+	if self.netResolver != nil {
+		dialer, _ := self.GetDialer()
 		tr := &http.Transport{
-			Dial:            dialer.Dial,
-			TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			Dial: dialer.Dial,
+			TLSClientConfig: &tls.Config{
+				InsecureSkipVerify: self.InsecureHttp,
+			},
 		}
 
 		client := http.Client{Transport: tr}
 		return &client, nil
 	} else {
-		return nil, errors.New("Resolver not initialized")
+		return nil, fmt.Errorf("Resolver not initialized")
 	}
 }
 
-func (r *DockerResolver) GetDialer() (*net.Dialer, error) {
-	if r.netResolver != nil {
+func (self *DockerResolver) GetDialer() (*net.Dialer, error) {
+	if self.netResolver != nil {
 		return &net.Dialer{
 			Timeout:  5 * time.Second,
-			Resolver: r.netResolver,
+			Resolver: self.netResolver,
 		}, nil
 	} else {
-		return nil, errors.New("Resolver not initialized")
+		return nil, fmt.Errorf("Resolver not initialized")
 	}
 }
 
-func (r *DockerResolver) VPrint(msg string) {
-	if r.Verbose {
+func (self *DockerResolver) VPrint(msg string) {
+	if self.Verbose {
 		fmt.Println(msg)
 	}
 }
@@ -88,7 +91,7 @@ func intBaseResolver(resolver string) *net.Resolver {
 			d := net.Dialer{
 				Timeout: time.Millisecond * time.Duration(10000),
 			}
-			return d.DialContext(ctx, network, resolver+":53")
+			return d.DialContext(ctx, network, resolver)
 		},
 	}
 	return res
@@ -101,12 +104,12 @@ func intGetResolver(resolver *DockerResolver) (*net.Resolver, error) {
 		resolver.VPrint("GetResolverEx: " + ip)
 		return intBaseResolver(addr.String()), nil
 	} else {
-		tReso := intBaseResolver("127.0.0.11")
+		tReso := intBaseResolver("127.0.0.11:53")
 		dRes, dResErr := intLookUp(tReso, resolver.Resolver)
 		if dResErr == nil && len(dRes) > 0 {
 			ip = dRes[0]
 			return intBaseResolver(ip), nil
 		}
 	}
-	return nil, errors.New("Can't get resolver for " + resolver.Resolver)
+	return nil, fmt.Errorf("Can't get resolver for %s", resolver.Resolver)
 }
