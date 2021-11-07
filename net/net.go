@@ -18,9 +18,6 @@ type DockerResolver struct {
 }
 
 func (resolver *DockerResolver) Init() error {
-	if resolver.Startup < 5*time.Second {
-		resolver.Startup = 5 * time.Second
-	}
 	if !strings.Contains(resolver.Resolver, ":") {
 		resolver.Resolver += ":53"
 	}
