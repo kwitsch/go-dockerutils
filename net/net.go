@@ -11,8 +11,8 @@ import (
 
 type DockerResolver struct {
 	Resolver    string        `koanf:"resolver"`
-	Startup     time.Duration `koanf:"startup"`
-	Verbose     bool          `koanf:"verbose"`
+	Startup     time.Duration `koanf:"startup" default:"5s"`
+	Verbose     bool          `koanf:"verbose" default:"false"`
 	netResolver *net.Resolver
 }
 
