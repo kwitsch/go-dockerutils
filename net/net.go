@@ -3,7 +3,6 @@ package net
 import (
 	"context"
 	"crypto/tls"
-	"errors"
 	"fmt"
 	"net"
 	"net/http"
@@ -32,7 +31,7 @@ func (resolver *DockerResolver) Init() error {
 			time.Sleep(time.Second)
 		}
 	}
-	return errors.New("Can't get resolver for " + resolver.Resolver)
+	return fmt.Errorf("Can't get resolver for %s", resolver.Resolver)
 }
 
 func (r *DockerResolver) LookUp(domain string) ([]string, error) {
@@ -41,7 +40,7 @@ func (r *DockerResolver) LookUp(domain string) ([]string, error) {
 		r.VPrint("LookUp: " + domain + " Result: " + res[0])
 		return res, resErr
 	} else {
-		return nil, errors.New("Resolver not initialized")
+		return nil, fmt.Errorf("Resolver not initialized")
 	}
 }
 
@@ -56,7 +55,7 @@ func (r *DockerResolver) GetHttpClient() (*http.Client, error) {
 		client := http.Client{Transport: tr}
 		return &client, nil
 	} else {
-		return nil, errors.New("Resolver not initialized")
+		return nil, fmt.Errorf("Resolver not initialized")
 	}
 }
 
@@ -67,7 +66,7 @@ func (r *DockerResolver) GetDialer() (*net.Dialer, error) {
 			Resolver: r.netResolver,
 		}, nil
 	} else {
-		return nil, errors.New("Resolver not initialized")
+		return nil, fmt.Errorf("Resolver not initialized")
 	}
 }
 
@@ -108,5 +107,5 @@ func intGetResolver(resolver *DockerResolver) (*net.Resolver, error) {
 			return intBaseResolver(ip), nil
 		}
 	}
-	return nil, errors.New("Can't get resolver for " + resolver.Resolver)
+	return nil, fmt.Errorf("Can't get resolver for %s", resolver.Resolver)
 }
