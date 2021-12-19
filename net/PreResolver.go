@@ -10,43 +10,43 @@ import (
 	"time"
 )
 
-type DockerResolver struct {
-	Resolver     string        `koanf:"resolver"`
-	Startup      time.Duration `koanf:"startup" default:"5s"`
-	Verbose      bool          `koanf:"verbose" default:"false"`
-	InsecureHttp bool          `koanf:"insecure_http" default:"false"`
-	netResolver  *net.Resolver
+type PreResolver struct {
+	Resolver          string        `koanf:"resolver"`
+	BootstrapResolver string        `koanf:"bootstrapResolver" default:"127.0.0.11:53"`
+	Startup           time.Duration `koanf:"startup" default:"5s"`
+	InsecureHttp      bool          `koanf:"insecure_http" default:"false"`
+	verbose           bool          `default:"false"`
+	netResolver       *net.Resolver
 }
 
-func (self *DockerResolver) Init() error {
-	if !strings.Contains(self.Resolver, ":") {
-		self.Resolver += ":53"
-	}
+func (self *PreResolver) Init(verbose bool) error {
+	self.Resolver = ensurePort(self.Resolver)
+	self.BootstrapResolver = ensurePort(self.BootstrapResolver)
 	for i := 0; i < int(self.Startup.Seconds()); i++ {
 		r, rErr := intGetResolver(self)
 		if rErr == nil {
 			self.netResolver = r
-			self.VPrint("Resolver initialized")
+			self.vPrint("Resolver initialized")
 			return nil
 		} else {
-			self.VPrint("Resolver lookup failed")
+			self.vPrint("Resolver lookup failed")
 			time.Sleep(time.Second)
 		}
 	}
 	return fmt.Errorf("Can't get resolver for %s", self.Resolver)
 }
 
-func (self *DockerResolver) LookUp(domain string) ([]string, error) {
+func (self *PreResolver) LookUp(domain string) ([]string, error) {
 	if self.netResolver != nil {
 		res, resErr := intLookUp(self.netResolver, domain)
-		self.VPrint("LookUp: " + domain + " Result: " + res[0])
+		self.vPrint("LookUp: " + domain + " Result: " + res[0])
 		return res, resErr
 	} else {
 		return nil, fmt.Errorf("Resolver not initialized")
 	}
 }
 
-func (self *DockerResolver) GetHttpClient() (*http.Client, error) {
+func (self *PreResolver) GetHttpClient() (*http.Client, error) {
 	if self.netResolver != nil {
 		dialer, _ := self.GetDialer()
 		tr := &http.Transport{
@@ -63,7 +63,7 @@ func (self *DockerResolver) GetHttpClient() (*http.Client, error) {
 	}
 }
 
-func (self *DockerResolver) GetDialer() (*net.Dialer, error) {
+func (self *PreResolver) GetDialer() (*net.Dialer, error) {
 	if self.netResolver != nil {
 		return &net.Dialer{
 			Timeout:  5 * time.Second,
@@ -74,10 +74,17 @@ func (self *DockerResolver) GetDialer() (*net.Dialer, error) {
 	}
 }
 
-func (self *DockerResolver) VPrint(msg string) {
-	if self.Verbose {
-		fmt.Println(msg)
+func (self *PreResolver) vPrint(a ...interface{}) {
+	if self.verbose {
+		fmt.Println(a...)
 	}
+}
+
+func ensurePort(adr string) string {
+	if !strings.Contains(adr, ":") {
+		adr += ":53"
+	}
+	return adr
 }
 
 func intLookUp(resolver *net.Resolver, domain string) ([]string, error) {
@@ -97,14 +104,14 @@ func intBaseResolver(resolver string) *net.Resolver {
 	return res
 }
 
-func intGetResolver(resolver *DockerResolver) (*net.Resolver, error) {
+func intGetResolver(resolver *PreResolver) (*net.Resolver, error) {
 	addr := net.ParseIP(resolver.Resolver)
 	ip := resolver.Resolver
 	if addr != nil {
-		resolver.VPrint("GetResolverEx: " + ip)
+		resolver.vPrint("GetResolverEx: " + ip)
 		return intBaseResolver(addr.String()), nil
 	} else {
-		tReso := intBaseResolver("127.0.0.11:53")
+		tReso := intBaseResolver(resolver.BootstrapResolver)
 		dRes, dResErr := intLookUp(tReso, resolver.Resolver)
 		if dResErr == nil && len(dRes) > 0 {
 			ip = dRes[0]
